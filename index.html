@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelf of Shame Accountability Partner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-6">
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-md p-6 mt-10 border border-gray-700">
+        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Shelf of Shame Tracker</h1>
+        <p class="text-center text-gray-400 mb-6">Accountability partner for <strong>prpost</strong></p>
+
+        <div id="loading" class="text-center text-yellow-400 py-4">Initializing and syncing with BGG & Supabase...</div>
+
+        <div id="target-section" class="hidden bg-indigo-950 border border-indigo-500 rounded-lg p-5 mb-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-1">Your Active Assignment</h2>
+            <p id="target-name" class="text-2xl font-bold text-white mb-4">Game Name Here</p>
+            <p class="text-gray-300 mb-4">Have you put this to the table yet? If so, decide its ultimate fate:</p>
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="evaluateTarget('KEEP')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">Keep</button>
+                <button onclick="evaluateTarget('CULL')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">Cull</button>
+                <button onclick="evaluateTarget('TRY AGAIN')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition">Try Again</button>
+            </div>
+        </div>
+
+        <div id="selection-section" class="hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200">Select Your Next Target</h2>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-6">
+                <button onclick="pickRandom()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                    <span class="block font-bold text-indigo-300">🎲 Pure Chaos</span>
+                    <span class="text-xs text-gray-400">Pick a completely random unplayed game.</span>
+                </button>
+                <button onclick="pickHighestRated()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                    <span class="block font-bold text-indigo-300">📈 Trust the Crowd</span>
+                    <span class="text-xs text-gray-400">Pick the highest BGG-rated game.</span>
+                </button>
+            </div>
+
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Or Choose Manually (<span id="unplayed-count">0</span> unplayed found)</h3>
+            <ul id="games-list" class="divide-y divide-gray-700 max-h-60 overflow-y-auto pr-2">
+                </ul>
+        </div>
+    </div>
+
+    <div class="w-full max-w-2xl mt-6">
+        <h3 class="text-md font-semibold text-gray-400 mb-2">📜 Past Decisions Log</h3>
+        <div id="history-log" class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 space-y-2">
+            </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const SUPABASE_URL = "https://yokazfpgbjotdggkyumg.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_g4Sy3-7Mrq3JXk7C5WJ2WA_SI7rhub8";
+        const USERNAME = "prpost";
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let unplayedGames = [];
+        let currentTargetRow = null;
+
+        // Initialize App
+        async function init() {
+            try {
+                await checkActiveTarget();
+                await fetchBGGCollection();
+                await loadHistoryLog();
+                document.getElementById('loading').classList.add('hidden');
+                renderUI();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading').innerText = "Error initializing app. Check console.";
+            }
+        }
+
+        // Fetch target from Supabase
+        async function checkActiveTarget() {
+            const { data, error } = await supabase
+                .from('shelf_tracker')
+                .select('*')
+                .eq('status', 'TARGET')
+                .maybeSingle();
+            
+            if (error) throw error;
+            currentTargetRow = data;
+        }
+
+        // Fetch unplayed games from BGG
+        async function fetchBGGCollection() {
+            const url = `https://boardgamegeek.com/xmlapi2/collection?username=${USERNAME}&own=1&excludesubtype=boardgameexpansion&stats=1`;
+            
+            let response = await fetch(url);
+            // BGG handles heavy requests with 202 status codes. Retry if needed.
+            if (response.status === 202) {
+                document.getElementById('loading').innerText = "BGG is preparing your collection. Retrying in 4 seconds...";
+                await new Promise(r => setTimeout(r, 4000));
+                response = await fetch(url);
+            }
+
+            const text = await response.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+            const items = xmlDoc.getElementsByTagName("item");
+
+            unplayedGames = [];
+            for (let item of items) {
+                const numplays = parseInt(item.getElementsByTagName("numplays")[0].textContent);
+                if (numplays === 0) {
+                    const name = item.getElementsByTagName("name")[0].textContent;
+                    const objectid = item.getAttribute("objectid");
+                    const rating = parseFloat(item.getElementsByTagName("average")[0].getAttribute("value")) || 0;
+                    unplayedGames.push({ id: objectid, name, rating });
+                }
+            }
+            document.getElementById('unplayed-count').innerText = unplayedGames.length;
+        }
+
+        // Load History from Supabase
+        async function loadHistoryLog() {
+            const { data, error } = await supabase
+                .from('shelf_tracker')
+                .select('*')
+                .neq('status', 'TARGET')
+                .order('created_at', { ascending: false });
+
+            const container = document.getElementById('history-log');
+            if (data && data.length > 0) {
+                container.innerHTML = data.map(item => {
+                    let color = item.status === 'KEEP' ? 'text-green-400' : item.status === 'CULL' ? 'text-red-400' : 'text-yellow-400';
+                    return `<div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span>${item.game_name}</span>
+                        <span class="font-bold ${color}">${item.status}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = `<p class="text-gray-500 italic">No decisions logged yet.</p>`;
+            }
+        }
+
+        function renderUI() {
+            if (currentTargetRow) {
+                document.getElementById('target-name').innerText = currentTargetRow.game_name;
+                document.getElementById('target-section').classList.remove('hidden');
+                document.getElementById('selection-section').classList.add('hidden');
+            } else {
+                document.getElementById('target-section').classList.add('hidden');
+                document.getElementById('selection-section').classList.remove('hidden');
+                
+                const list = document.getElementById('games-list');
+                list.innerHTML = unplayedGames.map(g => `
+                    <li class="py-2 flex justify-between items-center">
+                        <span>${g.name} <span class="text-xs text-gray-500">⭐ ${g.rating.toFixed(1)}</span></span>
+                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded transition">Target</button>
+                    </li>
+                `).join('');
+            }
+        }
+
+        // Lock in a game target
+        async function lockTarget(name, id) {
+            const { error } = await supabase
+                .from('shelf_tracker')
+                .insert([{ game_name: name, bgg_id: id, status: 'TARGET' }]);
+            
+            if (error) alert(error.message);
+            else init();
+        }
+
+        // Evaluate target game
+        async function evaluateTarget(decision) {
+            if (!currentTargetRow) return;
+            
+            const { error } = await supabase
+                .from('shelf_tracker')
+                .update({ status: decision })
+                .eq('id', currentTargetRow.id);
+
+            if (error) alert(error.message);
+            else init();
+        }
+
+        // Automation Picker Options
+        function pickRandom() {
+            if (unplayedGames.length === 0) return;
+            const game = unplayedGames[Math.floor(Math.random() * unplayedGames.length)];
+            lockTarget(game.name, game.id);
+        }
+
+        function pickHighestRated() {
+            if (unplayedGames.length === 0) return;
+            const game = unplayedGames.reduce((max, g) => g.rating > max.rating ? g : max, unplayedGames[0]);
+            lockTarget(game.name, game.id);
+        }
+
+        // Start App
+        init();
+    </script>
+</body>
+</html>
