@@ -87,19 +87,26 @@
             currentTargetRow = data;
         }
 
-        // Fetch unplayed games from BGG
+        // Fetch unplayed games from BGG using a CORS proxy
         async function fetchBGGCollection() {
-            const url = `https://boardgamegeek.com/xmlapi2/collection?username=${USERNAME}&own=1&excludesubtype=boardgameexpansion&stats=1`;
+            const bggUrl = `https://boardgamegeek.com/xmlapi2/collection?username=${USERNAME}&own=1&excludesubtype=boardgameexpansion&stats=1`;
             
-            let response = await fetch(url);
-            // BGG handles heavy requests with 202 status codes. Retry if needed.
-            if (response.status === 202) {
-                document.getElementById('loading').innerText = "BGG is preparing your collection. Retrying in 4 seconds...";
-                await new Promise(r => setTimeout(r, 4000));
-                response = await fetch(url);
+            // We use the allorigins proxy to bypass browser CORS blocks
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(bggUrl)}`;
+            
+            let response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Network response was not ok.");
+            
+            const data = await response.json();
+            const text = data.contents; // The actual XML string returned from BGG
+
+            // If BGG is still generating the data (returns an empty response or explicit 202 notice)
+            if (!text || text.includes('status="202"') || text.length < 100) {
+                document.getElementById('loading').innerText = "BGG is preparing your collection. Retrying in 5 seconds...";
+                await new Promise(r => setTimeout(r, 5000));
+                return fetchBGGCollection(); // Retry
             }
 
-            const text = await response.text();
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(text, "text/xml");
             const items = xmlDoc.getElementsByTagName("item");
@@ -110,12 +117,17 @@
                 if (numplays === 0) {
                     const name = item.getElementsByTagName("name")[0].textContent;
                     const objectid = item.getAttribute("objectid");
-                    const rating = parseFloat(item.getElementsByTagName("average")[0].getAttribute("value")) || 0;
+                    
+                    // Safely extract rating
+                    const averageEl = item.getElementsByTagName("average")[0];
+                    const rating = averageEl ? parseFloat(averageEl.getAttribute("value")) : 0;
+                    
                     unplayedGames.push({ id: objectid, name, rating });
                 }
             }
             document.getElementById('unplayed-count').innerText = unplayedGames.length;
         }
+
 
         // Load History from Supabase
         async function loadHistoryLog() {
