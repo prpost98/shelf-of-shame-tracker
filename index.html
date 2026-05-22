@@ -15,15 +15,18 @@
 
         <div id="loading" class="text-center text-yellow-400 py-4">Initializing and syncing with BGG & Supabase...</div>
 
-        <div id="target-section" class="hidden bg-indigo-950 border border-indigo-500 rounded-lg p-5 mb-6">
+         <div id="target-section" class="hidden bg-indigo-950 border border-indigo-500 rounded-lg p-5 mb-6">
             <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-1">Your Active Assignment</h2>
             <p id="target-name" class="text-2xl font-bold text-white mb-4">Game Name Here</p>
             <p class="text-gray-300 mb-4">Have you put this to the table yet? If so, decide its ultimate fate:</p>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-3 gap-3 mb-4">
                 <button onclick="evaluateTarget('KEEP')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">Keep</button>
                 <button onclick="evaluateTarget('CULL')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">Cull</button>
                 <button onclick="evaluateTarget('TRY AGAIN')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition">Try Again</button>
             </div>
+            <button onclick="resetTarget()" class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium py-1.5 px-4 rounded border border-gray-600 transition">
+                🔄 Mistake? Reset Assignment
+            </button>
         </div>
 
 	<div id="selection-section" class="hidden">
@@ -229,6 +232,25 @@ function renderUI() {
             else init();
         }
 
+// Completely remove the active target from the database to choose a new one
+        async function resetTarget() {
+            if (!currentTargetRow) return;
+            
+            const confirmReset = confirm(`Are you sure you want to clear your assignment for "${currentTargetRow.game_name}"?`);
+            if (!confirmReset) return;
+
+            const { error } = await supabaseClient
+                .from('shelf_tracker')
+                .delete()
+                .eq('id', currentTargetRow.id);
+
+            if (error) {
+                alert("Failed to reset assignment: " + error.message);
+            } else {
+                // Refresh the application state to unlock the UI
+                init();
+            }
+        }
         // Automation Picker Options
         function pickRandom() {
             if (unplayedGames.length === 0) return;
