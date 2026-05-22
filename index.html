@@ -57,7 +57,7 @@
         const SUPABASE_ANON_KEY = "sb_publishable_g4Sy3-7Mrq3JXk7C5WJ2WA_SI7rhub8";
         const USERNAME = "prpost";
         
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+	const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let unplayedGames = [];
         let currentTargetRow = null;
 
@@ -77,7 +77,7 @@
 
         // Fetch target from Supabase
         async function checkActiveTarget() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('shelf_tracker')
                 .select('*')
                 .eq('status', 'TARGET')
@@ -90,7 +90,7 @@
 // Fetch unplayed games via our secure Supabase Edge Function
         async function fetchBGGCollection() {
             // Call your custom Supabase Edge function
-            const { data, error } = await supabase.functions.invoke('fetch-bgg-collection', {
+            const { data, error } = await supabaseClient.functions.invoke('fetch-bgg-collection', {
                 body: { username: USERNAME }
             });
 
@@ -128,7 +128,7 @@
 
         // Load History from Supabase
         async function loadHistoryLog() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('shelf_tracker')
                 .select('*')
                 .neq('status', 'TARGET')
@@ -169,7 +169,7 @@
 
         // Lock in a game target
         async function lockTarget(name, id) {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('shelf_tracker')
                 .insert([{ game_name: name, bgg_id: id, status: 'TARGET' }]);
             
@@ -181,7 +181,7 @@
         async function evaluateTarget(decision) {
             if (!currentTargetRow) return;
             
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('shelf_tracker')
                 .update({ status: decision })
                 .eq('id', currentTargetRow.id);
