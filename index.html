@@ -10,7 +10,7 @@
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-6">
 
     <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-md p-6 mt-10 border border-gray-700">
-        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Shelf of Shame Tracker v1.01</h1>
+        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Shelf of Shame Tracker v1.02</h1>
         <p class="text-center text-gray-400 mb-6">Accountability partner for <strong>prpost</strong></p>
 
         <div id="loading" class="text-center text-yellow-400 py-4">Initializing and syncing with BGG & Supabase...</div>
@@ -87,28 +87,27 @@
             currentTargetRow = data;
         }
 
-        // Fetch unplayed games from BGG using a CORS proxy
+// Fetch unplayed games via our secure Supabase Edge Function
         async function fetchBGGCollection() {
-            const bggUrl = `https://boardgamegeek.com/xmlapi2/collection?username=${USERNAME}&own=1&excludesubtype=boardgameexpansion&stats=1`;
-            
-            // We use the allorigins proxy to bypass browser CORS blocks
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(bggUrl)}`;
-            
-            let response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Network response was not ok.");
-            
-            const data = await response.json();
-            const text = data.contents; // The actual XML string returned from BGG
+            // Call your custom Supabase Edge function
+            const { data, error } = await supabase.functions.invoke('fetch-bgg-collection', {
+                body: { username: USERNAME }
+            });
 
-            // If BGG is still generating the data (returns an empty response or explicit 202 notice)
-            if (!text || text.includes('status="202"') || text.length < 100) {
-                document.getElementById('loading').innerText = "BGG is preparing your collection. Retrying in 5 seconds...";
+            if (error) {
+                console.error("Edge function error:", error);
+                throw new Error("Failed to pull from Supabase edge function");
+            }
+
+            // If BGG is still processing data (returns a 202 status)
+            if (data.status === 202 || !data.xml || data.xml.includes('status="202"')) {
+                document.getElementById('loading').innerText = "BGG is compiling your authorization payload. Retrying in 5 seconds...";
                 await new Promise(r => setTimeout(r, 5000));
-                return fetchBGGCollection(); // Retry
+                return fetchBGGCollection();
             }
 
             const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(text, "text/xml");
+            const xmlDoc = parser.parseFromString(data.xml, "text/xml");
             const items = xmlDoc.getElementsByTagName("item");
 
             unplayedGames = [];
@@ -118,7 +117,6 @@
                     const name = item.getElementsByTagName("name")[0].textContent;
                     const objectid = item.getAttribute("objectid");
                     
-                    // Safely extract rating
                     const averageEl = item.getElementsByTagName("average")[0];
                     const rating = averageEl ? parseFloat(averageEl.getAttribute("value")) : 0;
                     
@@ -127,7 +125,6 @@
             }
             document.getElementById('unplayed-count').innerText = unplayedGames.length;
         }
-
 
         // Load History from Supabase
         async function loadHistoryLog() {
