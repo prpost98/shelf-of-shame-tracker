@@ -141,7 +141,21 @@
                     unplayedGames.push({ id: objectid, name, rating, rank: bggRank });
                 }
             }
-            document.getElementById('unplayed-count').innerText = unplayedGames.length;
+	    // --- NEW: Filter out games that already have a decision logged in Supabase ---
+            // Fetch all games from Supabase that aren't 'TARGET'
+            const { data: historicalDecisions, error: dbError } = await supabaseClient
+                .from('shelf_tracker')
+                .select('game_name, status')
+                .neq('status', 'TARGET');
+
+            if (!dbError && historicalDecisions) {
+                // Create a list of names we want to exclude
+                const excludedNames = historicalDecisions.map(d => d.game_name);
+                
+                // Filter our array to ONLY include games NOT found in our history
+                unplayedGames = unplayedGames.filter(g => !excludedNames.includes(g.name));
+            }
+            // --------------------------------------------------------------------------            	    document.getElementById('unplayed-count').innerText = unplayedGames.length;
         }
 
         // Load History from Supabase
