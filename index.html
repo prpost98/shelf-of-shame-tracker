@@ -26,16 +26,20 @@
             </div>
         </div>
 
-        <div id="selection-section" class="hidden">
+	<div id="selection-section" class="hidden">
             <h2 class="text-xl font-semibold mb-4 text-gray-200">Select Your Next Target</h2>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-6">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
                 <button onclick="pickRandom()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
                     <span class="block font-bold text-indigo-300">🎲 Pure Chaos</span>
                     <span class="text-xs text-gray-400">Pick a completely random unplayed game.</span>
                 </button>
                 <button onclick="pickHighestRated()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
                     <span class="block font-bold text-indigo-300">📈 Trust the Crowd</span>
-                    <span class="text-xs text-gray-400">Pick the highest BGG-rated game.</span>
+                    <span class="text-xs text-gray-400">Pick the highest BGG rating (e.g. 8.2).</span>
+                </button>
+                <button onclick="pickBestRanked()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                    <span class="block font-bold text-indigo-300">🏆 The Elite Choice</span>
+                    <span class="text-xs text-gray-400">Pick the game closest to BGG Rank #1.</span>
                 </button>
             </div>
 
@@ -119,8 +123,22 @@
                     
                     const averageEl = item.getElementsByTagName("average")[0];
                     const rating = averageEl ? parseFloat(averageEl.getAttribute("value")) : 0;
+                    // --- ADD THIS LOGIC TO EXTRACT THE RANK ---
+                    let bggRank = "N/A";
+                    const ranks = item.getElementsByTagName("rank");
+                    for (let r of ranks) {
+                        // We specifically want the overall board game rank, not specific sub-categories
+                        if (r.getAttribute("name") === "boardgame") {
+                            const value = r.getAttribute("value");
+                            // BGG returns "Not Ranked" if a game is too obscure or new
+                            bggRank = (value && value !== "Not Ranked") ? value : "N/A";
+                            break;
+                        }
+                    }
+                    // ------------------------------------------
                     
-                    unplayedGames.push({ id: objectid, name, rating });
+                    // Include 'rank' in the object we push to our array
+                    unplayedGames.push({ id: objectid, name, rating, rank: bggRank });
                 }
             }
             document.getElementById('unplayed-count').innerText = unplayedGames.length;
@@ -148,7 +166,7 @@
             }
         }
 
-        function renderUI() {
+function renderUI() {
             if (currentTargetRow) {
                 document.getElementById('target-name').innerText = currentTargetRow.game_name;
                 document.getElementById('target-section').classList.remove('hidden');
@@ -159,9 +177,16 @@
                 
                 const list = document.getElementById('games-list');
                 list.innerHTML = unplayedGames.map(g => `
-                    <li class="py-2 flex justify-between items-center">
-                        <span>${g.name} <span class="text-xs text-gray-500">⭐ ${g.rating.toFixed(1)}</span></span>
-                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded transition">Target</button>
+                    <li class="py-2 flex justify-between items-center border-b border-gray-800">
+                        <div class="flex flex-col">
+                            <span class="font-medium">${g.name}</span>
+                            <div class="flex space-x-2 mt-0.5 text-xs">
+                                <span class="text-gray-400">⭐ ${g.rating.toFixed(1)}</span>
+                                <span class="text-gray-500">|</span>
+                                <span class="text-indigo-400 font-semibold">🏆 Rank: #${g.rank}</span>
+                            </div>
+                        </div>
+                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition font-medium">Target</button>
                     </li>
                 `).join('');
             }
@@ -200,6 +225,16 @@
         function pickHighestRated() {
             if (unplayedGames.length === 0) return;
             const game = unplayedGames.reduce((max, g) => g.rating > max.rating ? g : max, unplayedGames[0]);
+            lockTarget(game.name, game.id);
+        }
+
+	function pickBestRanked() {
+            if (unplayedGames.length === 0) return;
+            // Filter out unranked games, then sort ascending (1 is better than 5000)
+            const rankedGames = unplayedGames.filter(g => g.rank !== "N/A");
+            if (rankedGames.length === 0) return pickRandom(); // Fallback if nothing has a rank
+            
+            const game = rankedGames.reduce((best, g) => parseInt(g.rank) < parseInt(best.rank) ? g : best, rankedGames[0]);
             lockTarget(game.name, game.id);
         }
 
