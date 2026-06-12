@@ -15,7 +15,8 @@
 
         <div id="loading" class="text-center text-yellow-400 py-4">Initializing and syncing with BGG & Supabase...</div>
 
-         <div id="target-section" class="hidden bg-indigo-950 border border-indigo-500 rounded-lg p-5 mb-6">
+        <!-- SECTION 1: Active Assignment -->
+        <div id="target-section" class="hidden bg-indigo-950 border border-indigo-500 rounded-lg p-5 mb-6">
             <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-1">Your Active Assignment</h2>
             <p id="target-name" class="text-2xl font-bold text-white mb-4">Game Name Here</p>
             <p class="text-gray-300 mb-4">Have you put this to the table yet? If so, decide its ultimate fate:</p>
@@ -29,33 +30,46 @@
             </button>
         </div>
 
-	<div id="selection-section" class="hidden">
+        <!-- SECTION 2: Selection Mode -->
+        <div id="selection-section" class="hidden">
             <h2 class="text-xl font-semibold mb-4 text-gray-200">Select Your Next Target</h2>
+            
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
                 <button onclick="pickRandom()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
                     <span class="block font-bold text-indigo-300">🎲 Pure Chaos</span>
-                    <span class="text-xs text-gray-400">Pick a completely random unplayed game.</span>
+                    <span class="text-xs text-gray-400">Pick a random game matching filters.</span>
                 </button>
                 <button onclick="pickHighestRated()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
                     <span class="block font-bold text-indigo-300">📈 Trust the Crowd</span>
-                    <span class="text-xs text-gray-400">Pick the highest BGG rating (e.g. 8.2).</span>
+                    <span class="text-xs text-gray-400">Pick highest rated matching game.</span>
                 </button>
                 <button onclick="pickBestRanked()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
                     <span class="block font-bold text-indigo-300">🏆 The Elite Choice</span>
-                    <span class="text-xs text-gray-400">Pick the game closest to BGG Rank #1.</span>
+                    <span class="text-xs text-gray-400">Pick best BGG ranked matching game.</span>
                 </button>
             </div>
 
-            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Or Choose Manually (<span id="unplayed-count">0</span> unplayed found)</h3>
-            <ul id="games-list" class="divide-y divide-gray-700 max-h-60 overflow-y-auto pr-2">
-                </ul>
+            <!-- SEARCH AND FILTER CONTROLS -->
+            <div class="bg-gray-900 p-4 rounded-lg border border-gray-800 mb-4 space-y-3">
+                <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="🔍 Search collection by name..." class="w-full bg-gray-800 border border-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                
+                <div class="flex flex-wrap gap-2 text-xs font-medium">
+                    <button id="filter-all" onclick="setFilter('all')" class="px-3 py-1.5 rounded bg-indigo-600 text-white">All Unprocessed (<span id="count-all">0</span>)</button>
+                    <button id="filter-unplayed" onclick="setFilter('unplayed')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">Shelf of Shame (<span id="count-unplayed">0</span>)</button>
+                    <button id="filter-played" onclick="setFilter('played')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">Played (<span id="count-played">0</span>)</button>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <ul id="games-list" class="divide-y divide-gray-800 max-h-96 overflow-y-auto"></ul>
+            </div>
         </div>
     </div>
 
+    <!-- SECTION 3: Past Decisions History -->
     <div class="w-full max-w-2xl mt-6">
         <h3 class="text-md font-semibold text-gray-400 mb-2">📜 Past Decisions Log</h3>
-        <div id="history-log" class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 space-y-2">
-            </div>
+        <div id="history-log" class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 space-y-2"></div>
     </div>
 
     <script>
@@ -64,9 +78,13 @@
         const SUPABASE_ANON_KEY = "sb_publishable_g4Sy3-7Mrq3JXk7C5WJ2WA_SI7rhub8";
         const USERNAME = "prpost";
         
-	const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        let unplayedGames = [];
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Global App State
+        let collectionPool = []; 
         let currentTargetRow = null;
+        let currentFilter = 'all'; 
+        let searchQuery = '';
 
         // Initialize App
         async function init() {
@@ -94,9 +112,8 @@
             currentTargetRow = data;
         }
 
-// Fetch unplayed games via our secure Supabase Edge Function
+        // Fetch games via your secure Supabase Edge Function
         async function fetchBGGCollection() {
-            // Call your custom Supabase Edge function
             const { data, error } = await supabaseClient.functions.invoke('fetch-bgg-collection', {
                 body: { username: USERNAME }
             });
@@ -106,7 +123,6 @@
                 throw new Error("Failed to pull from Supabase edge function");
             }
 
-            // If BGG is still processing data (returns a 202 status)
             if (data.status === 202 || !data.xml || data.xml.includes('status="202"')) {
                 document.getElementById('loading').innerText = "BGG is compiling your authorization payload. Retrying in 5 seconds...";
                 await new Promise(r => setTimeout(r, 5000));
@@ -117,48 +133,43 @@
             const xmlDoc = parser.parseFromString(data.xml, "text/xml");
             const items = xmlDoc.getElementsByTagName("item");
 
-            unplayedGames = [];
+            let allGames = [];
             for (let item of items) {
-                const numplays = parseInt(item.getElementsByTagName("numplays")[0].textContent);
-                if (numplays === 0) {
-                    const name = item.getElementsByTagName("name")[0].textContent;
-                    const objectid = item.getAttribute("objectid");
-                    
-                    const averageEl = item.getElementsByTagName("average")[0];
-                    const rating = averageEl ? parseFloat(averageEl.getAttribute("value")) : 0;
-                    // --- ADD THIS LOGIC TO EXTRACT THE RANK ---
-                    let bggRank = "N/A";
-                    const ranks = item.getElementsByTagName("rank");
-                    for (let r of ranks) {
-                        // We specifically want the overall board game rank, not specific sub-categories
-                        if (r.getAttribute("name") === "boardgame") {
-                            const value = r.getAttribute("value");
-                            // BGG returns "Not Ranked" if a game is too obscure or new
-                            bggRank = (value && value !== "Not Ranked") ? value : "N/A";
-                            break;
-                        }
+                // Pulled out of the sub-loop block to read every game in the response payload
+                const numplays = parseInt(item.getElementsByTagName("numplays")[0]?.textContent || 0);
+                const name = item.getElementsByTagName("name")[0].textContent;
+                const objectid = item.getAttribute("objectid");
+                
+                const averageEl = item.getElementsByTagName("average")[0];
+                const rating = averageEl ? parseFloat(averageEl.getAttribute("value")) : 0;
+                
+                let bggRank = "N/A";
+                const ranks = item.getElementsByTagName("rank");
+                for (let r of ranks) {
+                    if (r.getAttribute("name") === "boardgame") {
+                        const value = r.getAttribute("value");
+                        bggRank = (value && value !== "Not Ranked") ? value : "N/A";
+                        break;
                     }
-                    // ------------------------------------------
-                    
-                    // Include 'rank' in the object we push to our array
-                    unplayedGames.push({ id: objectid, name, rating, rank: bggRank });
                 }
+                
+                allGames.push({ id: objectid, name, rating, rank: bggRank, plays: numplays });
             }
-	    // --- NEW: Filter out games that already have a decision logged in Supabase ---
-            // Fetch all games from Supabase that aren't 'TARGET'
+
+            // Filter out games that already have a finalized decision logged in Supabase
             const { data: historicalDecisions, error: dbError } = await supabaseClient
                 .from('shelf_tracker')
                 .select('game_name, status')
                 .neq('status', 'TARGET');
 
             if (!dbError && historicalDecisions) {
-                // Create a list of names we want to exclude
                 const excludedNames = historicalDecisions.map(d => d.game_name);
-                
-                // Filter our array to ONLY include games NOT found in our history
-                unplayedGames = unplayedGames.filter(g => !excludedNames.includes(g.name));
+                collectionPool = allGames.filter(g => !excludedNames.includes(g.name));
+            } else {
+                collectionPool = allGames;
             }
-            // --------------------------------------------------------------------------            	    document.getElementById('unplayed-count').innerText = unplayedGames.length;
+
+            updateFilterCounts();
         }
 
         // Load History from Supabase
@@ -183,7 +194,45 @@
             }
         }
 
-function renderUI() {
+        // Live Event Filter Handlers
+        function handleSearch(val) {
+            searchQuery = val.toLowerCase().trim();
+            renderUI();
+        }
+
+        function setFilter(filterType) {
+            currentFilter = filterType;
+            
+            // Manage UI active highlight styling tags across the menu options
+            ['all', 'unplayed', 'played'].forEach(type => {
+                const btn = document.getElementById(`filter-${type}`);
+                if (type === filterType) {
+                    btn.className = "px-3 py-1.5 rounded bg-indigo-600 text-white font-medium";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700 font-medium";
+                }
+            });
+            
+            renderUI();
+        }
+
+        function updateFilterCounts() {
+            document.getElementById('count-all').innerText = collectionPool.length;
+            document.getElementById('count-unplayed').innerText = collectionPool.filter(g => g.plays === 0).length;
+            document.getElementById('count-played').innerText = collectionPool.filter(g => g.plays > 0).length;
+        }
+
+        function getFilteredGames() {
+            return collectionPool.filter(g => {
+                if (currentFilter === 'unplayed' && g.plays > 0) return false;
+                if (currentFilter === 'played' && g.plays === 0) return false;
+                if (searchQuery && !g.name.toLowerCase().includes(searchQuery)) return false;
+                return true;
+            });
+        }
+
+        // Main Interface Render Block
+        function renderUI() {
             if (currentTargetRow) {
                 document.getElementById('target-name').innerText = currentTargetRow.game_name;
                 document.getElementById('target-section').classList.remove('hidden');
@@ -192,15 +241,26 @@ function renderUI() {
                 document.getElementById('target-section').classList.add('hidden');
                 document.getElementById('selection-section').classList.remove('hidden');
                 
+                const filteredGames = getFilteredGames();
                 const list = document.getElementById('games-list');
-                list.innerHTML = unplayedGames.map(g => `
+                
+                if (filteredGames.length === 0) {
+                    list.innerHTML = `<li class="py-4 text-center text-gray-500 italic">No matching titles found in pool view.</li>`;
+                    return;
+                }
+
+                list.innerHTML = filteredGames.map(g => `
                     <li class="py-2 flex justify-between items-center border-b border-gray-800">
                         <div class="flex flex-col">
                             <span class="font-medium">${g.name}</span>
-                            <div class="flex space-x-2 mt-0.5 text-xs">
+                            <div class="flex space-x-2 mt-0.5 text-xs items-center">
                                 <span class="text-gray-400">⭐ ${g.rating.toFixed(1)}</span>
                                 <span class="text-gray-500">|</span>
                                 <span class="text-indigo-400 font-semibold">🏆 Rank: #${g.rank}</span>
+                                <span class="text-gray-500">|</span>
+                                <span class="${g.plays > 0 ? 'text-green-400 font-semibold' : 'text-amber-500'}">
+                                    🔄 Plays: ${g.plays}
+                                </span>
                             </div>
                         </div>
                         <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition font-medium">Target</button>
@@ -232,7 +292,7 @@ function renderUI() {
             else init();
         }
 
-// Completely remove the active target from the database to choose a new one
+        // Completely remove the active target from the database to choose a new one
         async function resetTarget() {
             if (!currentTargetRow) return;
             
@@ -247,28 +307,31 @@ function renderUI() {
             if (error) {
                 alert("Failed to reset assignment: " + error.message);
             } else {
-                // Refresh the application state to unlock the UI
                 init();
             }
         }
-        // Automation Picker Options
+
+        // Automation Picker Options (Now dynamically wired to check getFilteredGames() pool)
         function pickRandom() {
-            if (unplayedGames.length === 0) return;
-            const game = unplayedGames[Math.floor(Math.random() * unplayedGames.length)];
+            const activePool = getFilteredGames();
+            if (activePool.length === 0) return;
+            const game = activePool[Math.floor(Math.random() * activePool.length)];
             lockTarget(game.name, game.id);
         }
 
         function pickHighestRated() {
-            if (unplayedGames.length === 0) return;
-            const game = unplayedGames.reduce((max, g) => g.rating > max.rating ? g : max, unplayedGames[0]);
+            const activePool = getFilteredGames();
+            if (activePool.length === 0) return;
+            const game = activePool.reduce((max, g) => g.rating > max.rating ? g : max, activePool[0]);
             lockTarget(game.name, game.id);
         }
 
-	function pickBestRanked() {
-            if (unplayedGames.length === 0) return;
-            // Filter out unranked games, then sort ascending (1 is better than 5000)
-            const rankedGames = unplayedGames.filter(g => g.rank !== "N/A");
-            if (rankedGames.length === 0) return pickRandom(); // Fallback if nothing has a rank
+        function pickBestRanked() {
+            const activePool = getFilteredGames();
+            if (activePool.length === 0) return;
+            
+            const rankedGames = activePool.filter(g => g.rank !== "N/A");
+            if (rankedGames.length === 0) return pickRandom(); 
             
             const game = rankedGames.reduce((best, g) => parseInt(g.rank) < parseInt(best.rank) ? g : best, rankedGames[0]);
             lockTarget(game.name, game.id);
