@@ -220,7 +220,8 @@
                 .from('shelf_tracker')
                 .select('*')
                 .neq('status', 'TARGET')
-                .order('created_at', { ascending: false });
+                .order('status', { ascending: true })
+                .order('game_name', { ascending: true });
 
             if (error) {
                 console.error("Error loading log history data:", error);
