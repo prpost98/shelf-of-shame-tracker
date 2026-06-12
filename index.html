@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Board Game Collection Accountability Partner</title>
+    <title>Shelf of Shame Accountability Partner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-6">
 
     <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-md p-6 mt-10 border border-gray-700">
-        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Board Game Collection Manager v1.04</h1>
+        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Shelf of Shame Tracker v1.05</h1>
         <p class="text-center text-gray-400 mb-4">Accountability partner for <strong>prpost</strong></p>
 
         <!-- STATS SUMMARY BANNER -->
@@ -97,7 +97,7 @@
         const SUPABASE_URL = "https://yokazfpgbjotdggkyumg.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_g4Sy3-7Mrq3JXk7C5WJ2WA_SI7rhub8";
         const USERNAME = "prpost";
-        const GRACE_PERIOD_DAYS = 90; // Days a "KEEP" game has to be played before breaking promise
+        const GRACE_PERIOD_DAYS = 90; 
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -187,7 +187,6 @@
                 
                 historicalDecisions.forEach(decision => {
                     if (decision.status === 'KEEP') {
-                        // --- STRATEGY 3: EVALUATE PLAY COUNT PROMISE ---
                         const bggGameData = allGames.find(g => g.name === decision.game_name);
                         
                         if (bggGameData) {
@@ -195,15 +194,13 @@
                             const daysElapsed = (new Date() - decisionDate) / (1000 * 60 * 60 * 24);
                             const playsAtDecision = decision.plays_at_decision || 0;
 
-                            // If time is up AND you haven't logged any new plays on BGG, trigger the breach loop!
                             if (daysElapsed > GRACE_PERIOD_DAYS && bggGameData.plays <= playsAtDecision) {
                                 bggGameData.customLabel = "🔄 Untouched Keep";
-                                return; // Do NOT exclude it! It goes back into the selection pool
+                                return; 
                             }
                         }
                     }
                     
-                    // Standard exclusion rule for active processed items
                     if (decision.status !== 'TRY AGAIN') {
                         excludedNames.push(decision.game_name);
                     }
@@ -259,7 +256,6 @@
                     
                     if (item.status === 'KEEP') {
                         badgeColor = 'text-green-400';
-                        // --- STRATEGY 2: MANUAL RE-EVALUATION valve ---
                         actionButton = `<button onclick="deleteDecisionRecord(${item.id}, '${item.game_name.replace(/'/g, "\\'")}')" class="ml-2 text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded border border-gray-600 transition cursor-pointer">🔄 Re-Evaluate</button>`;
                     } else if (item.status === 'TRY AGAIN') {
                         badgeColor = 'text-yellow-400';
@@ -299,7 +295,7 @@
             else init();
         }
 
-        // --- STRATEGY 2 IMPLEMENTATION: DELETE ROW TO RE-EVALUATE ---
+        // Manual drop to pull a keep back into circulation
         async function deleteDecisionRecord(id, title) {
             const confirmReset = confirm(`Do you want to clear your KEEP history record for "${title}" and pass it back into the selection pool?`);
             if (!confirmReset) return;
@@ -368,14 +364,14 @@
                 }
 
                 list.innerHTML = filteredGames.map(g => {
-                    // Render special breach warning label inline if it cracked the promise window
                     const alertBadge = g.customLabel ? `<span class="ml-2 px-1.5 py-0.5 bg-red-950/60 border border-red-900 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider animate-pulse">${g.customLabel}</span>` : '';
-                    
+                    const safeName = g.name.replace(/'/g, "\\'");
+
                     return `
                     <li class="py-2 flex justify-between items-center border-b border-gray-800">
-                        <div class="flex flex-col">
+                        <div class="flex flex-col pr-2 overflow-hidden">
                             <div class="flex items-center">
-                                <span class="font-medium">${g.name}</span>
+                                <span class="font-medium truncate">${g.name}</span>
                                 ${alertBadge}
                             </div>
                             <div class="flex space-x-2 mt-0.5 text-xs items-center">
@@ -388,13 +384,20 @@
                                 </span>
                             </div>
                         </div>
-                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition font-medium cursor-pointer">Target</button>
+                        
+                        <!-- --- NEW: COMPACT ACTION BUTTON GROUP PANEL --- -->
+                        <div class="flex items-center space-x-1 shrink-0">
+                            <button onclick="lockTarget('${safeName}', '${g.id}')" title="Focus as Active Target" class="text-xs bg-indigo-600 hover:bg-indigo-500 font-medium px-2.5 py-1.5 rounded transition cursor-pointer text-white">Target</button>
+                            <button onclick="quickEvaluateTarget('${safeName}', '${g.id}', 'KEEP')" title="Fast Keep" class="text-xs bg-emerald-700 hover:bg-emerald-600 font-medium px-2 py-1.5 rounded transition cursor-pointer text-white">Keep</button>
+                            <button onclick="quickEvaluateTarget('${safeName}', '${g.id}', 'CULL')" title="Fast Cull" class="text-xs bg-rose-700 hover:bg-rose-600 font-medium px-2 py-1.5 rounded transition cursor-pointer text-white">Cull</button>
+                        </div>
+                        <!-- ----------------------------------------------- -->
                     </li>
                 `}).join('');
             }
         }
 
-        // Lock in a game target
+        // Lock in a game target (The standard long-form accountability route)
         async function lockTarget(name, id) {
             const { error } = await supabaseClient
                 .from('shelf_tracker')
@@ -404,13 +407,35 @@
             else init();
         }
 
+        // --- NEW: INLINE TRIAGE FAST-TRACK ROUTE ---
+        async function quickEvaluateTarget(name, id, decision) {
+            let insertPayload = { game_name: name, bgg_id: id, status: decision };
+            
+            // Instantly snap active BGG play score metrics if fast-keeping
+            if (decision === 'KEEP') {
+                const poolMatch = collectionPool.find(g => g.name === name);
+                if (poolMatch) {
+                    insertPayload.plays_at_decision = poolMatch.plays;
+                }
+            }
+
+            const { error } = await supabaseClient
+                .from('shelf_tracker')
+                .insert([insertPayload]);
+
+            if (error) {
+                alert("Quick triage action failed: " + error.message);
+            } else {
+                init(); // Refresh data states and clear row items
+            }
+        }
+
         // Evaluate target game
         async function evaluateTarget(decision) {
             if (!currentTargetRow) return;
             
             let updatePayload = { status: decision };
             
-            // --- STRATEGY 3 MECHANISM: CAPTURE PLAY COUNT SNAPSHOT ---
             if (decision === 'KEEP') {
                 const poolMatch = collectionPool.find(g => g.name === currentTargetRow.game_name);
                 if (poolMatch) {
