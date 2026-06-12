@@ -3,15 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shelf of Shame Accountability Partner</title>
+    <title>Board Game Collection Accountability Partner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-6">
 
     <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-md p-6 mt-10 border border-gray-700">
-        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Collection Manager 1.1</h1>
-        <p class="text-center text-gray-400 mb-6">Accountability partner for <strong>prpost</strong></p>
+        <h1 class="text-3xl font-bold text-center text-indigo-400 mb-2">🎲 Board Game Collection Manager v1.04</h1>
+        <p class="text-center text-gray-400 mb-4">Accountability partner for <strong>prpost</strong></p>
+
+        <!-- STATS SUMMARY BANNER -->
+        <div id="stats-banner" class="grid grid-cols-4 gap-2 text-center bg-gray-950 border border-gray-850 p-3 rounded-xl mb-6 text-xs shadow-inner">
+            <div>
+                <span class="block text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Decided</span>
+                <span id="stat-total" class="text-lg font-bold text-indigo-400">0</span>
+            </div>
+            <div>
+                <span class="block text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">Kept</span>
+                <span id="stat-kept" class="text-lg font-bold text-emerald-400">0</span>
+            </div>
+            <div>
+                <span class="block text-rose-400 font-semibold uppercase tracking-wider mb-0.5">To Cull</span>
+                <span id="stat-cull" class="text-lg font-bold text-rose-400">0</span>
+            </div>
+            <div>
+                <span class="block text-slate-400 font-semibold uppercase tracking-wider mb-0.5">Gone</span>
+                <span id="stat-gone" class="text-lg font-bold text-slate-200">0</span>
+            </div>
+        </div>
 
         <div id="loading" class="text-center text-yellow-400 py-4">Initializing and syncing with BGG & Supabase...</div>
 
@@ -21,11 +41,11 @@
             <p id="target-name" class="text-2xl font-bold text-white mb-4">Game Name Here</p>
             <p class="text-gray-300 mb-4">Have you put this to the table yet? If so, decide its ultimate fate:</p>
             <div class="grid grid-cols-3 gap-3 mb-4">
-                <button onclick="evaluateTarget('KEEP')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">Keep</button>
-                <button onclick="evaluateTarget('CULL')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">Cull</button>
-                <button onclick="evaluateTarget('TRY AGAIN')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition">Try Again</button>
+                <button onclick="evaluateTarget('KEEP')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition cursor-pointer">Keep</button>
+                <button onclick="evaluateTarget('CULL')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition cursor-pointer">Cull</button>
+                <button onclick="evaluateTarget('TRY AGAIN')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded transition cursor-pointer">Try Again</button>
             </div>
-            <button onclick="resetTarget()" class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium py-1.5 px-4 rounded border border-gray-600 transition">
+            <button onclick="resetTarget()" class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium py-1.5 px-4 rounded border border-gray-600 transition cursor-pointer">
                 🔄 Mistake? Reset Assignment
             </button>
         </div>
@@ -35,15 +55,15 @@
             <h2 class="text-xl font-semibold mb-4 text-gray-200">Select Your Next Target</h2>
             
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
-                <button onclick="pickRandom()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                <button onclick="pickRandom()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition cursor-pointer">
                     <span class="block font-bold text-indigo-300">🎲 Pure Chaos</span>
                     <span class="text-xs text-gray-400">Pick a random game matching filters.</span>
                 </button>
-                <button onclick="pickHighestRated()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                <button onclick="pickHighestRated()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition cursor-pointer">
                     <span class="block font-bold text-indigo-300">📈 Trust the Crowd</span>
                     <span class="text-xs text-gray-400">Pick highest rated matching game.</span>
                 </button>
-                <button onclick="pickBestRanked()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition">
+                <button onclick="pickBestRanked()" class="p-4 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-left transition cursor-pointer">
                     <span class="block font-bold text-indigo-300">🏆 The Elite Choice</span>
                     <span class="text-xs text-gray-400">Pick best BGG ranked matching game.</span>
                 </button>
@@ -54,9 +74,9 @@
                 <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="🔍 Search collection by name..." class="w-full bg-gray-800 border border-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
                 
                 <div class="flex flex-wrap gap-2 text-xs font-medium">
-                    <button id="filter-all" onclick="setFilter('all')" class="px-3 py-1.5 rounded bg-indigo-600 text-white">All Unprocessed (<span id="count-all">0</span>)</button>
-                    <button id="filter-unplayed" onclick="setFilter('unplayed')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">Shelf of Shame (<span id="count-unplayed">0</span>)</button>
-                    <button id="filter-played" onclick="setFilter('played')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700">Played (<span id="count-played">0</span>)</button>
+                    <button id="filter-all" onclick="setFilter('all')" class="px-3 py-1.5 rounded bg-indigo-600 text-white cursor-pointer">All Unprocessed (<span id="count-all">0</span>)</button>
+                    <button id="filter-unplayed" onclick="setFilter('unplayed')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700 cursor-pointer">Shelf of Shame (<span id="count-unplayed">0</span>)</button>
+                    <button id="filter-played" onclick="setFilter('played')" class="px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700 cursor-pointer">Played (<span id="count-played">0</span>)</button>
                 </div>
             </div>
 
@@ -67,7 +87,7 @@
     </div>
 
     <!-- SECTION 3: Past Decisions History -->
-    <div class="w-full max-w-2xl mt-6">
+    <div class="w-full max-w-2xl mt-6 pb-12">
         <h3 class="text-md font-semibold text-gray-400 mb-2">📜 Past Decisions Log</h3>
         <div id="history-log" class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-gray-300 space-y-2"></div>
     </div>
@@ -77,6 +97,7 @@
         const SUPABASE_URL = "https://yokazfpgbjotdggkyumg.supabase.co"; 
         const SUPABASE_ANON_KEY = "sb_publishable_g4Sy3-7Mrq3JXk7C5WJ2WA_SI7rhub8";
         const USERNAME = "prpost";
+        const GRACE_PERIOD_DAYS = 90; // Days a "KEEP" game has to be played before breaking promise
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -135,7 +156,6 @@
 
             let allGames = [];
             for (let item of items) {
-                // Pulled out of the sub-loop block to read every game in the response payload
                 const numplays = parseInt(item.getElementsByTagName("numplays")[0]?.textContent || 0);
                 const name = item.getElementsByTagName("name")[0].textContent;
                 const objectid = item.getAttribute("objectid");
@@ -153,17 +173,42 @@
                     }
                 }
                 
-                allGames.push({ id: objectid, name, rating, rank: bggRank, plays: numplays });
+                allGames.push({ id: objectid, name, rating, rank: bggRank, plays: numplays, customLabel: "" });
             }
 
-            // Filter out games that already have a finalized decision logged in Supabase
+            // Fetch history records to parse exclusions or play-count accountabilities
             const { data: historicalDecisions, error: dbError } = await supabaseClient
                 .from('shelf_tracker')
-                .select('game_name, status')
+                .select('*')
                 .neq('status', 'TARGET');
 
             if (!dbError && historicalDecisions) {
-                const excludedNames = historicalDecisions.map(d => d.game_name);
+                let excludedNames = [];
+                
+                historicalDecisions.forEach(decision => {
+                    if (decision.status === 'KEEP') {
+                        // --- STRATEGY 3: EVALUATE PLAY COUNT PROMISE ---
+                        const bggGameData = allGames.find(g => g.name === decision.game_name);
+                        
+                        if (bggGameData) {
+                            const decisionDate = new Date(decision.created_at);
+                            const daysElapsed = (new Date() - decisionDate) / (1000 * 60 * 60 * 24);
+                            const playsAtDecision = decision.plays_at_decision || 0;
+
+                            // If time is up AND you haven't logged any new plays on BGG, trigger the breach loop!
+                            if (daysElapsed > GRACE_PERIOD_DAYS && bggGameData.plays <= playsAtDecision) {
+                                bggGameData.customLabel = "🔄 Untouched Keep";
+                                return; // Do NOT exclude it! It goes back into the selection pool
+                            }
+                        }
+                    }
+                    
+                    // Standard exclusion rule for active processed items
+                    if (decision.status !== 'TRY AGAIN') {
+                        excludedNames.push(decision.game_name);
+                    }
+                });
+                
                 collectionPool = allGames.filter(g => !excludedNames.includes(g.name));
             } else {
                 collectionPool = allGames;
@@ -172,7 +217,7 @@
             updateFilterCounts();
         }
 
-        // Load History from Supabase
+        // Load History Log & Compute Summary Metrics
         async function loadHistoryLog() {
             const { data, error } = await supabaseClient
                 .from('shelf_tracker')
@@ -180,18 +225,92 @@
                 .neq('status', 'TARGET')
                 .order('created_at', { ascending: false });
 
+            if (error) {
+                console.error("Error loading log history data:", error);
+                return;
+            }
+
+            let keptCount = 0;
+            let cullCount = 0;
+            let goneCount = 0;
+            let tryAgainCount = 0;
+
+            if (data) {
+                data.forEach(item => {
+                    if (item.status === 'KEEP') keptCount++;
+                    else if (item.status === 'CULL') cullCount++;
+                    else if (item.status === 'CULLED_DONE') goneCount++;
+                    else if (item.status === 'TRY AGAIN') tryAgainCount++;
+                });
+            }
+
+            document.getElementById('stat-total').innerText = keptCount + cullCount + goneCount + tryAgainCount;
+            document.getElementById('stat-kept').innerText = keptCount;
+            document.getElementById('stat-cull').innerText = cullCount;
+            document.getElementById('stat-gone').innerText = goneCount;
+
             const container = document.getElementById('history-log');
             if (data && data.length > 0) {
                 container.innerHTML = data.map(item => {
-                    let color = item.status === 'KEEP' ? 'text-green-400' : item.status === 'CULL' ? 'text-red-400' : 'text-yellow-400';
-                    return `<div class="flex justify-between border-b border-gray-700 pb-1">
-                        <span>${item.game_name}</span>
-                        <span class="font-bold ${color}">${item.status}</span>
+                    let badgeColor = '';
+                    let actionButton = '';
+                    let titleStyle = '';
+                    let displayStatus = item.status;
+                    
+                    if (item.status === 'KEEP') {
+                        badgeColor = 'text-green-400';
+                        // --- STRATEGY 2: MANUAL RE-EVALUATION valve ---
+                        actionButton = `<button onclick="deleteDecisionRecord(${item.id}, '${item.game_name.replace(/'/g, "\\'")}')" class="ml-2 text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded border border-gray-600 transition cursor-pointer">🔄 Re-Evaluate</button>`;
+                    } else if (item.status === 'TRY AGAIN') {
+                        badgeColor = 'text-yellow-400';
+                    } else if (item.status === 'CULL') {
+                        badgeColor = 'text-rose-400 font-bold animate-pulse';
+                        actionButton = `<button onclick="markAsGone(${item.id}, '${item.game_name.replace(/'/g, "\\'")}')" class="ml-2 text-[10px] bg-slate-700 hover:bg-rose-950 text-slate-300 hover:text-rose-200 px-2 py-0.5 rounded border border-slate-600 hover:border-rose-900 transition cursor-pointer font-medium">📦 Mark Gone</button>`;
+                    } else if (item.status === 'CULLED_DONE') {
+                        badgeColor = 'text-gray-500 font-normal';
+                        titleStyle = 'line-through text-gray-500';
+                        displayStatus = 'GONE';
+                    }
+
+                    return `<div class="flex justify-between items-center border-b border-gray-700 pb-1.5 pt-0.5">
+                        <span class="${titleStyle}">${item.game_name}</span>
+                        <div class="flex items-center">
+                            <span class="font-bold text-xs uppercase tracking-wide ${badgeColor}">${displayStatus}</span>
+                            ${actionButton}
+                        </div>
                     </div>`;
                 }).join('');
             } else {
-                container.innerHTML = `<p class="text-gray-500 italic">No decisions logged yet.</p>`;
+                container.innerHTML = `<p class="text-gray-500 italic text-center py-2">No decisions logged yet.</p>`;
             }
+        }
+
+        // Action script handler to mark an item as physically culled
+        async function markAsGone(id, title) {
+            const confirmGone = confirm(`Confirm you have physically sold, traded, or donated "${title}"?`);
+            if (!confirmGone) return;
+
+            const { error } = await supabaseClient
+                .from('shelf_tracker')
+                .update({ status: 'CULLED_DONE' })
+                .eq('id', id);
+
+            if (error) alert(error.message);
+            else init();
+        }
+
+        // --- STRATEGY 2 IMPLEMENTATION: DELETE ROW TO RE-EVALUATE ---
+        async function deleteDecisionRecord(id, title) {
+            const confirmReset = confirm(`Do you want to clear your KEEP history record for "${title}" and pass it back into the selection pool?`);
+            if (!confirmReset) return;
+
+            const { error } = await supabaseClient
+                .from('shelf_tracker')
+                .delete()
+                .eq('id', id);
+
+            if (error) alert("Failed to clear decision profile: " + error.message);
+            else init();
         }
 
         // Live Event Filter Handlers
@@ -203,13 +322,12 @@
         function setFilter(filterType) {
             currentFilter = filterType;
             
-            // Manage UI active highlight styling tags across the menu options
             ['all', 'unplayed', 'played'].forEach(type => {
                 const btn = document.getElementById(`filter-${type}`);
                 if (type === filterType) {
-                    btn.className = "px-3 py-1.5 rounded bg-indigo-600 text-white font-medium";
+                    btn.className = "px-3 py-1.5 rounded bg-indigo-600 text-white font-medium cursor-pointer";
                 } else {
-                    btn.className = "px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700 font-medium";
+                    btn.className = "px-3 py-1.5 rounded bg-gray-800 text-gray-400 hover:bg-gray-700 font-medium cursor-pointer";
                 }
             });
             
@@ -245,14 +363,21 @@
                 const list = document.getElementById('games-list');
                 
                 if (filteredGames.length === 0) {
-                    list.innerHTML = `<li class="py-4 text-center text-gray-500 italic">No matching titles found in pool view.</li>`;
+                    list.innerHTML = `<li class="py-4 text-center text-gray-500 italic text-sm">No matching titles found in pool view.</li>`;
                     return;
                 }
 
-                list.innerHTML = filteredGames.map(g => `
+                list.innerHTML = filteredGames.map(g => {
+                    // Render special breach warning label inline if it cracked the promise window
+                    const alertBadge = g.customLabel ? `<span class="ml-2 px-1.5 py-0.5 bg-red-950/60 border border-red-900 text-red-400 text-[10px] font-bold rounded uppercase tracking-wider animate-pulse">${g.customLabel}</span>` : '';
+                    
+                    return `
                     <li class="py-2 flex justify-between items-center border-b border-gray-800">
                         <div class="flex flex-col">
-                            <span class="font-medium">${g.name}</span>
+                            <div class="flex items-center">
+                                <span class="font-medium">${g.name}</span>
+                                ${alertBadge}
+                            </div>
                             <div class="flex space-x-2 mt-0.5 text-xs items-center">
                                 <span class="text-gray-400">⭐ ${g.rating.toFixed(1)}</span>
                                 <span class="text-gray-500">|</span>
@@ -263,9 +388,9 @@
                                 </span>
                             </div>
                         </div>
-                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition font-medium">Target</button>
+                        <button onclick="lockTarget('${g.name.replace(/'/g, "\\'")}', '${g.id}')" class="text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition font-medium cursor-pointer">Target</button>
                     </li>
-                `).join('');
+                `}).join('');
             }
         }
 
@@ -283,9 +408,19 @@
         async function evaluateTarget(decision) {
             if (!currentTargetRow) return;
             
+            let updatePayload = { status: decision };
+            
+            // --- STRATEGY 3 MECHANISM: CAPTURE PLAY COUNT SNAPSHOT ---
+            if (decision === 'KEEP') {
+                const poolMatch = collectionPool.find(g => g.name === currentTargetRow.game_name);
+                if (poolMatch) {
+                    updatePayload.plays_at_decision = poolMatch.plays;
+                }
+            }
+
             const { error } = await supabaseClient
                 .from('shelf_tracker')
-                .update({ status: decision })
+                .update(updatePayload)
                 .eq('id', currentTargetRow.id);
 
             if (error) alert(error.message);
@@ -304,14 +439,11 @@
                 .delete()
                 .eq('id', currentTargetRow.id);
 
-            if (error) {
-                alert("Failed to reset assignment: " + error.message);
-            } else {
-                init();
-            }
+            if (error) alert("Failed to reset assignment: " + error.message);
+            else init();
         }
 
-        // Automation Picker Options (Now dynamically wired to check getFilteredGames() pool)
+        // Automation Picker Options
         function pickRandom() {
             const activePool = getFilteredGames();
             if (activePool.length === 0) return;
